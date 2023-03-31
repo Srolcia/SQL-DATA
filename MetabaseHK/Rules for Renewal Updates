@@ -46,6 +46,7 @@ SELECT
               FROM Orders o 
               WHERE o.PetId = s.PetId AND o.CreationDate > s.CreationDate 
               ORDER BY o.CreationDate ASC LIMIT 1) < 
+ #Return the first non-null value in a list
              COALESCE((SELECT MIN(se.UnsubscribedAt) 
                        FROM SubscriptionsEventsHistory se 
                        WHERE se.SubscriptionId = s.Id), '9999-12-31')) 
