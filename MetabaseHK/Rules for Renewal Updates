@@ -1,0 +1,61 @@
+SELECT 
+    s.Id, 
+    s.PetId, 
+    s.CreationDate, 
+    s.State,
+#The first subquery retrieves the date of the first order (M1 ORDER DATE) for each subscription that was placed after the subscription creation date. 
+#It does this by joining the Orders table with the Subscriptions table on the PetId column and filtering for orders that were created after the subscription creation date. 
+#The subquery then orders the results by the order creation date and selects the first row.
+    (SELECT o.CreationDate 
+     FROM Orders o 
+     WHERE o.PetId = s.PetId AND o.CreationDate > s.CreationDate 
+     ORDER BY o.CreationDate ASC LIMIT 1) AS "M1 ORDER DATE",
+ #The second subquery retrieves the date of the first unsubscribe event (1ST UNSUB) for each subscription. 
+ #It does this by joining the SubscriptionsEventsHistory table with the Subscriptions table on the SubscriptionId column and selecting the minimum UnsubscribedAt value.
+    (SELECT MIN(se.UnsubscribedAt) 
+     FROM SubscriptionsEventsHistory se 
+     WHERE se.SubscriptionId = s.Id) AS "1ST UNSUB",
+#The third subquery retrieves the date of the first subscription retention status (1ST UNSUB INTENT) for each subscription. 
+#It does this by joining the SubscriptionRetentionStatus table with the Subscriptions table on the SubscriptionId column and selecting the minimum date.
+    (SELECT srs.Date 
+     FROM SubscriptionRetentionStatus srs 
+     WHERE srs.SubscriptionId = s.Id 
+     ORDER BY srs.Date ASC LIMIT 1) AS "1ST UNSUB INTENT",
+#The CASE statement applies a set of rules to determine the status of each subscription based on the M1 ORDER DATE, 1ST UNSUB, and 1ST UNSUB INTENT values.
+    CASE 
+        WHEN 
+            ((SELECT o.CreationDate 
+              FROM Orders o 
+              WHERE o.PetId = s.PetId AND o.CreationDate > s.CreationDate 
+              ORDER BY o.CreationDate ASC LIMIT 1) IS NULL) AND 
+            ((SELECT MIN(se.UnsubscribedAt) 
+              FROM SubscriptionsEventsHistory se 
+              WHERE se.SubscriptionId = s.Id) IS NULL) 
+        THEN 'Pending'
+        WHEN 
+            ((SELECT o.CreationDate 
+              FROM Orders o 
+              WHERE o.PetId = s.PetId AND o.CreationDate > s.CreationDate 
+              ORDER BY o.CreationDate ASC LIMIT 1) IS NULL) AND 
+            ((SELECT MIN(se.UnsubscribedAt) 
+              FROM SubscriptionsEventsHistory se 
+              WHERE se.SubscriptionId = s.Id) IS NOT NULL) 
+        THEN 'No'
+        WHEN 
+            ((SELECT o.CreationDate 
+              FROM Orders o 
+              WHERE o.PetId = s.PetId AND o.CreationDate > s.CreationDate 
+              ORDER BY o.CreationDate ASC LIMIT 1) < 
+             COALESCE((SELECT MIN(se.UnsubscribedAt) 
+                       FROM SubscriptionsEventsHistory se 
+                       WHERE se.SubscriptionId = s.Id), '9999-12-31')) 
+        THEN 'Yes'
+        ELSE 'No'
+    END AS "Subscription Status"
+FROM 
+    Subscriptions s
+#The WHERE clause filters the subscriptions based on their creation date. It selects only the subscriptions that were created after December 31st, 2020.
+WHERE 
+    s.CreationDate > '2020-12-31'
+ORDER BY 
+    s.CreationDate ASC;
