@@ -1,15 +1,17 @@
 SELECT 
+#select columns to be used
 distinct(o."PetId") AS "PetID", 
   p."PetName" AS "PetName",
   o."SubscriptionId" AS "SubscriptionId", 
   o."CouponCode" AS "CouponCode", 
   u."Email" AS "Email",
-  s."CreationDate" AS "SubscriptionCreationDate"
- 
+  s."CreationDate" AS "SubscriptionCreationDate" 
+#from database source (hk.orders)
 FROM hk.orders o
 INNER JOIN hk.pets p ON p."Id" = o."PetId"
 INNER JOIN hk.subscriptions s ON s."Id" = o."SubscriptionId"
 INNER JOIN hk.users u ON u."Id" = s."ClientId"
 INNER JOIN hk.user_coupons uc ON uc."PetId" = o."PetId"
+#where is a filter
 WHERE o."CouponCode" IN  (""
 )
