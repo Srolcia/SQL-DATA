@@ -1,28 +1,36 @@
-SELECT date(Temp_Table.Date) as "Date",
-SUM(Temp_Table.totalsubs) as "Total Subs ",
-SUM(Temp_Table.totalunsubs) as "Total Unsubs"
-    FROM (
-        SELECT s.CreationDate as "Date",
-        count(*) as "totalsubs",
-        0 as "totalunsubs"
-        FROM  Subscriptions as s
-           INNER JOIN Orders o ON o.PetId = s.PetId
-           RIGHT OUTER JOIN AntifraudChecks a ON a.OrderId= o.Id
-          
-        WHERE s.CreationDate > '2023-03-01'
-         
-         UNION ALL
-         
-        SELECT se.UnsubscribedAt as "Date", 
-        count(*) as "totalunsubs",
-        0 as "totalsubs"
-         FROM  SubscriptionsEventsHistory as se
-           INNER JOIN Subscriptions s ON s.Id = se.SubscriptionId
-           INNER JOIN Orders o ON o.PetId = s.PetId
-           RIGHT OUTER JOIN AntifraudChecks a ON a.OrderId= o.Id
-        
-    WHERE se.UnsubscribedAt > '2023-03-01'
-    ) AS Temp_Table
-WHERE Temp_Table.Date > '2023-03-01'
+SELECT 
+  DATE(Temp_Table.Date) AS "Date",
+  SUM(Temp_Table.totalsubs) AS "Total Subs",
+  SUM(Temp_Table.totalunsubs) AS "Total Unsubs"
+FROM (
+  SELECT 
+    s.CreationDate AS "Date",
+    COUNT(*) AS "totalsubs",
+    0 AS "totalunsubs"
+  FROM  
+    Subscriptions AS s
+    INNER JOIN Orders o ON o.PetId = s.PetId
+    LEFT OUTER JOIN AntifraudChecks a ON a.OrderId = o.Id
+  WHERE 
+    s.CreationDate > '2023-03-01'
+  GROUP BY 1
+
+  UNION ALL
+
+  SELECT 
+    se.UnsubscribedAt AS "Date", 
+    0 AS "totalsubs",
+    COUNT(*) AS "totalunsubs"
+  FROM  
+    SubscriptionsEventsHistory AS se
+    Inner JOIN Subscriptions s ON s.Id = se.SubscriptionId
+    inner JOIN Orders o ON o.PetId = s.PetId
+    right OUTER JOIN AntifraudChecks a ON a.OrderId = o.Id
+  WHERE 
+    se.UnsubscribedAt > '2023-03-01'
+  GROUP BY 1
+) AS Temp_Table
+WHERE 
+  Temp_Table.Date > '2023-03-01'
 GROUP BY 1
 ORDER BY 1 DESC
