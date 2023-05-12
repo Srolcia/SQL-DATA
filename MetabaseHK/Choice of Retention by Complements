@@ -1,0 +1,37 @@
+SELECT
+    DATE_FORMAT(finaltable.Date,"%m %y") AS "Date",
+    count(*) as "Total retentions",
+    count(case when finaltable.Complements is not null then 1 end) as "Retentions with Complements",
+    count(case when finaltable.Terrines is not null then 1 end) as "Retentions with Terrines",
+    count(case when finaltable.LeSaveur is not null then 1 end) as "Retentions with LeSaveur"
+FROM (
+    select pr.Id, pr.Date AS "Date", pr.PetId,
+    (select uc.CouponId from  UserCoupons uc inner join Coupons cc ON uc.CouponId = cc.id where uc.PetId = pr.PetId
+        and date(uc.CreationDate) = date(pr.date)
+        and uc.Enabled=true
+        and cc.MarketingType = "ComplementUpSelling"
+        and cc.ComplementID not in ('27370000002996362','27370000002996363','27370000002996527','27370000002996528')
+        order by uc.CreationDate desc limit 1) as Complements,
+    (select uc.CouponId from  UserCoupons uc inner join Coupons cc ON uc.CouponId = cc.id where uc.PetId = pr.PetId
+        and date(uc.CreationDate) = date(pr.date)
+        and uc.Enabled=true and cc.MarketingType = "ComplementUpSelling"
+        and cc.ComplementID in ('27370000002996362','27370000002996363','27370000002996527','27370000002996528')
+        order by uc.CreationDate desc limit 1) as Terrines,
+    (select sci.ItemId from  ShoppingCartItem sci inner join ShoppingCarts sc ON sc.Id=sci.ShoppingCartId where sc.PetId = pr.PetId
+        and date(sc.CreationDate) = date(pr.date)
+        and sci.ItemId in ('27370000002996530','27370000002996531','27370000002996532','27370000002996533','27370000002996534','27370000002996535')
+        order by sc.CreationDate desc limit 1) as LeSaveur
+    FROM (
+        SELECT ss.Date, ss.Id, s.PetId, s.Id as "SubscriptionId",
+          (SELECT COUNT(*) FROM Orders o WHERE o.PetId = s.PetId AND o.CreationDate < ss.Date - INTERVAL 1 HOUR) AS 'lastordernumber'
+        FROM SubscriptionRetentionStatus ss
+        INNER JOIN Subscriptions s ON ss.SubscriptionId = s.Id
+        WHERE ss.Date >= '2023-02-01'
+          AND ss.Date < '2023-05-01'
+          AND IsRetained = TRUE
+        GROUP BY 1, 2, 3
+        HAVING lastordernumber < 2
+    ) AS pr
+) AS finaltable
+GROUP BY DATE_FORMAT(Date, '%m %y')
+LIMIT 12;
