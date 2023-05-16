@@ -1,0 +1,74 @@
+SELECT
+  DATE_FORMAT(finaltable.Date, '%m %y') AS 'Month',
+  COUNT(*) AS 'Total retentions',
+  COUNT(CASE WHEN finaltable.CouponId IS NOT NULL THEN 1 END) AS 'Retentions with discount applied',
+  COUNT(CASE WHEN finaltable.Postpones IS NOT NULL THEN 1 END) AS 'Retentions with postponement',
+  COUNT(CASE WHEN finaltable.NewQuantity IS NOT NULL THEN 1 END) AS 'Retentions with change of quantity',
+  COUNT(CASE WHEN finaltable.RenewalInterval IS NOT NULL THEN 1 END) AS 'Retentions with new 60days renewal'
+FROM (
+  SELECT
+    pr.Date AS 'Date',
+    pr.Id,
+    (
+      SELECT uc.CouponId
+      FROM UserCoupons uc
+      INNER JOIN Coupons cc ON uc.CouponId = cc.id
+      WHERE
+        uc.PetId = pr.PetId
+        AND DATE(uc.CreationDate) = DATE(pr.date)
+        AND uc.Enabled = TRUE
+        AND cc.MarketingType <> 'ComplementUpSelling'
+      ORDER BY uc.CreationDate DESC
+      LIMIT 1
+    ) AS CouponId,
+    (
+      SELECT SUM(p.Duration)
+      FROM PostponeRequests p
+      WHERE
+        p.PetId = pr.PetId
+        AND DATE(p.Date) = DATE(pr.date)
+    ) AS Postpones,
+    (
+      SELECT pqh.NewQuantity
+      FROM ProductQuantityChangeHistory pqh
+      WHERE
+        pqh.PetId = pr.PetId
+        AND DATE(pqh.ChangedAt) = DATE(pr.date)
+        AND pqh.ChangedBy = 'BackOffice'
+      ORDER BY pqh.ChangedAt DESC
+      LIMIT 1
+    ) AS NewQuantity,
+    (
+      SELECT ich.EventName
+      FROM IntervalChangesHistory ich
+      WHERE
+        ich.PetId = pr.petId
+        AND DATE(ich.ChangedAt) = DATE(pr.Date)
+        AND ich.EventName = 'SubscriptionIntervalChangedFrom30To60'
+      ORDER BY ich.ChangedAt DESC
+      LIMIT 1
+    ) AS RenewalInterval
+  FROM (
+    SELECT
+      ss.Date,
+      ss.Id,
+      s.PetId,
+      (
+        SELECT COUNT(*)
+        FROM Orders o
+        WHERE
+          o.PetId = s.PetId
+          AND o.CreationDate < ss.Date - INTERVAL 1 HOUR
+      ) AS 'lastordernumber'
+    FROM SubscriptionRetentionStatus ss
+    INNER JOIN Subscriptions s ON ss.SubscriptionId = s.Id
+    WHERE
+      ss.Date >= '2022-01-01'
+      -- AND ss.Date < '2022-07-01'
+      AND IsRetained = TRUE
+      -- AND BackofficeUser = '@gmail.com'
+    -- HAVING lastordernumber = 2
+  ) pr
+  GROUP BY 1, 2, 3
+) finaltable 
+GROUP BY DATE_FORMAT(finaltable.Date, '%m %y')
