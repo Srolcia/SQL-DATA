@@ -1,0 +1,15 @@
+select date_format(finaltable.Date,"%m %y") AS "Date",
+count(*) as "# of total unsubs"
+from
+(
+select fs.Date, fs.Id, fs.IsRetained, fs.SubscriptionId, fs.PetId,
+(select count(*) from Orders o where o.PetId = fs.PetId and o.CreationDate < fs.Date - interval 1  hour) as "lastordernumber"
+from
+(select ss.Date, ss.Id, ss.IsRetained, ss.SubscriptionId, s.ClientId, s.State, s.PetId
+from SubscriptionRetentionStatus ss, Subscriptions s
+where ss.SubscriptionId = s.Id
+AND BackofficeUser = 'lucasroussain.hectorkitchen@gmail.com'
+and ss.Date >= '2022-01-01' 
+and ss.Date < '2023-06-01' ) fs
+-- having lastordernumber > 2) finaltable
+group by 1
