@@ -1,0 +1,84 @@
+SELECT
+  finaltable.Date,
+  finaltable.Id,
+  finaltable.IsRetained,
+  finaltable.SubscriptionId,
+  finaltable.PetId,
+  finaltable.BackofficeUser,
+   DATE_FORMAT(finaltable.Date, '%Y-%m-%d %H:%i:%s') AS Date,
+  DATE_FORMAT(finaltable.nextretentiondate, '%Y-%m-%d %H:%i:%s') AS nextretentiondate,
+  DATE_FORMAT(finaltable.nextunsubdate, '%Y-%m-%d %H:%i:%s') AS nextunsubdate,
+  DATE_FORMAT(finaltable.nextorderdate, '%Y-%m-%d %H:%i:%s') AS nextorderdate
+FROM
+  (
+    SELECT
+      fs.Date,
+      fs.Id,
+      fs.IsRetained,
+      fs.SubscriptionId,
+      fs.PetId,
+      fs.BackofficeUser,
+      (
+        SELECT
+          rs.Date
+        FROM
+          SubscriptionRetentionStatus rs
+        WHERE
+          rs.SubscriptionId = fs.SubscriptionId
+          AND rs.Date > fs.Date
+        ORDER BY
+          rs.Date ASC
+        LIMIT
+          1
+      ) AS "nextretentiondate",
+      (
+        SELECT
+          se.UnsubscribedAt
+        FROM
+          SubscriptionsEventsHistory se
+        WHERE
+          se.SubscriptionId = fs.SubscriptionId
+          AND se.UnsubscribedAt > fs.Date
+        ORDER BY
+          se.UnsubscribedAt ASC
+        LIMIT
+          1
+      ) AS "nextunsubdate",
+      (
+        SELECT
+          o.CreationDate
+        FROM
+          Orders o
+        WHERE
+          o.PetId = fs.PetId
+          AND o.CreationDate > fs.Date - INTERVAL 1 HOUR
+        ORDER BY
+          o.CreationDate ASC
+        LIMIT
+          1
+      ) AS "nextorderdate"
+    FROM
+      (
+        SELECT
+          ss.Date,
+          ss.Id,
+          ss.IsRetained,
+          ss.SubscriptionId,
+          s.ClientId,
+          s.State,
+          s.PetId,
+          ss.BackofficeUser
+        FROM
+          SubscriptionRetentionStatus ss,
+          Subscriptions s
+        WHERE
+          ss.SubscriptionId = s.Id
+          AND ss.Date >= '2023-01-01'
+          AND ss.Date < '2023-06-01'
+          AND IsRetained IS TRUE
+      ) fs
+  ) finaltable
+WHERE
+  finaltable.nextorderdate IS NOT NULL
+ORDER BY
+  1 ASC
