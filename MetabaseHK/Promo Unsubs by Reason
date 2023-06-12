@@ -1,0 +1,41 @@
+SELECT
+  DATE_FORMAT(rs.Date, "%m %y") AS "Month-Year",
+  COUNT(CASE WHEN fs.lastordernumber < 2 THEN 1 END) AS "# of total unsubs",
+  COUNT(CASE WHEN rs.MainUnsubscriptionReason = 'Stock' AND fs.lastordernumber < 2 THEN 1 END) AS "Stock unsub attempts",
+  COUNT(CASE WHEN rs.MainUnsubscriptionReason = 'Stock' AND rs.IsRetained IS TRUE AND fs.lastordernumber < 2 THEN 1 END) AS "Stock retentions",
+  COUNT(CASE WHEN rs.MainUnsubscriptionReason = 'Food' AND fs.lastordernumber < 2 THEN 1 END) AS "Food unsub attempts",
+  COUNT(CASE WHEN rs.MainUnsubscriptionReason = 'Food' AND rs.IsRetained IS TRUE AND fs.lastordernumber < 2 THEN 1 END) AS "Food retentions",
+  COUNT(CASE WHEN rs.MainUnsubscriptionReason = 'Digestion' AND fs.lastordernumber < 2 THEN 1 END) AS "Digestion unsub attempts",
+  COUNT(CASE WHEN rs.MainUnsubscriptionReason = 'Digestion' AND rs.IsRetained IS TRUE AND fs.lastordernumber < 2 THEN 1 END) AS "Digestion retentions",
+  COUNT(CASE WHEN rs.MainUnsubscriptionReason = 'Price' AND fs.lastordernumber < 2 THEN 1 END) AS "Price unsub attempts",
+  COUNT(CASE WHEN rs.MainUnsubscriptionReason = 'Price' AND rs.IsRetained IS TRUE AND fs.lastordernumber < 2 THEN 1 END) AS "Price retentions",
+  COUNT(CASE WHEN rs.MainUnsubscriptionReason = 'Delivery' AND fs.lastordernumber < 2 THEN 1 END) AS "Delivery unsub attempts",
+  COUNT(CASE WHEN rs.MainUnsubscriptionReason = 'Delivery' AND rs.IsRetained IS TRUE AND fs.lastordernumber < 2 THEN 1 END) AS "Delivery retentions",
+  COUNT(CASE WHEN rs.MainUnsubscriptionReason = 'Other' AND fs.lastordernumber < 2 THEN 1 END) AS "Other unsub attempts",
+  COUNT(CASE WHEN rs.MainUnsubscriptionReason = 'Other' AND rs.IsRetained IS TRUE AND fs.lastordernumber < 2 THEN 1 END) AS "Other retentions"
+FROM SubscriptionRetentionStatus rs
+LEFT JOIN (
+  SELECT
+    fs.Id,
+    fs.SubscriptionId,
+    COUNT(*) AS lastordernumber
+  FROM (
+    SELECT
+      ss.Date,
+      ss.Id,
+      ss.IsRetained,
+      ss.SubscriptionId,
+      s.ClientId,
+      s.State,
+      s.PetId
+    FROM SubscriptionRetentionStatus ss
+    JOIN Subscriptions s ON ss.SubscriptionId = s.Id
+    WHERE ss.Date >= '2023-04-01' AND ss.Date < '2023-07-03'
+  ) fs
+  LEFT JOIN Orders o ON o.PetId = fs.PetId AND o.CreationDate < fs.Date - INTERVAL 1 HOUR
+  GROUP BY fs.Id, fs.SubscriptionId
+  HAVING COUNT(*) < 2
+) fs ON rs.Id = fs.Id
+WHERE rs.Date >= '2023-04-01'
+GROUP BY DATE_FORMAT(rs.Date, "%m %y")
+ORDER BY rs.Date ASC;
