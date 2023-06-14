@@ -1,0 +1,36 @@
+SELECT 
+    ss.Id, 
+    ss.PetId, 
+    ss.CreationDate, 
+    ss.State,
+    ss.M1orderdate,
+    ss.MinUnsub,
+    TIMESTAMPDIFF(Hour, ss.M1orderdate, ss.MinUnsub) AS M1_MinUnsub_Hours
+FROM (
+    SELECT
+        s.Id, 
+        s.PetId, 
+        s.CreationDate, 
+        s.State,
+        (SELECT o.CreationDate 
+         FROM Orders o 
+         WHERE o.PetId = s.PetId AND o.CreationDate > s.CreationDate 
+         ORDER BY o.CreationDate ASC LIMIT 1) AS M1orderdate,
+        LEAST(
+            (SELECT MIN(se.UnsubscribedAt) 
+             FROM SubscriptionsEventsHistory se 
+             WHERE se.SubscriptionId = s.Id),
+            (SELECT srs.Date 
+             FROM SubscriptionRetentionStatus srs 
+             WHERE srs.SubscriptionId = s.Id 
+             ORDER BY srs.Date ASC 
+             LIMIT 1)
+        ) AS MinUnsub
+    FROM 
+        Subscriptions s
+    WHERE 
+        s.CreationDate > '2023-04-01'
+    HAVING 
+        M1orderdate > 0 
+        OR MinUnsub > 0
+) ss;
