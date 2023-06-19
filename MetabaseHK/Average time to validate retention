@@ -1,0 +1,44 @@
+SELECT
+    fs.Date,
+    fs.Id,
+    fs.IsRetained,
+    fs.SubscriptionId,
+    fs.PetId,
+    fs.BackofficeUser,
+    (
+        SELECT rs.Date
+        FROM SubscriptionRetentionStatus rs
+        WHERE rs.SubscriptionId = fs.SubscriptionId AND rs.Date > fs.Date
+        ORDER BY rs.Date ASC LIMIT 1
+    ) AS "next retention date",
+    (
+        SELECT se.UnsubscribedAt
+        FROM SubscriptionsEventsHistory se
+        WHERE se.SubscriptionId = fs.SubscriptionId AND se.UnsubscribedAt > fs.Date
+        ORDER BY se.UnsubscribedAt ASC LIMIT 1
+    ) AS "next unsub date",
+    (
+        SELECT o.CreationDate
+        FROM Orders o
+        WHERE o.PetId = fs.PetId AND o.CreationDate > fs.Date - INTERVAL 1 HOUR
+        ORDER BY o.CreationDate ASC LIMIT 1
+    ) AS "next order date"
+FROM
+    (
+        SELECT
+            ss.Date,
+            ss.Id,
+            ss.IsRetained,
+            ss.SubscriptionId,
+            s.ClientId,
+            s.State,
+            s.PetId,
+            ss.BackofficeUser
+        FROM
+            SubscriptionRetentionStatus ss,
+            Subscriptions s
+        WHERE
+            ss.SubscriptionId = s.Id
+            AND ss.Date >= '2023-06-09'
+    ) fs
+
